@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Python Concurrency: Parallelism, Threading & Asyncio</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="classroom">
+    <!-- Sidebar: lesson list -->
+    <aside class="sidebar">
+      <div class="sidebar-header">
+        <h2>Lessons</h2>
+        <button class="sidebar-toggle" aria-label="Collapse menu">☰</button>
+      </div>
+      <nav class="lesson-list">
+        <a href="#" class="lesson-item active" data-slide="1">1. Introduction</a>
+        <a href="#" class="lesson-item" data-slide="2">2. Definitions</a>
+        <a href="#" class="lesson-item" data-slide="3">3. GIL</a>
+        <a href="#" class="lesson-item" data-slide="4">4. Three paradigms</a>
+        <a href="#" class="lesson-item" data-slide="5">5. I/O vs CPU bound</a>
+        <a href="#" class="lesson-item" data-slide="6">6. Race condition</a>
+        <a href="#" class="lesson-item" data-slide="7">7. Thread sync & Queue</a>
+        <a href="#" class="lesson-item" data-slide="8">8. Decision table</a>
+        <a href="#" class="lesson-item" data-slide="9">9. asyncio + to_thread</a>
+        <a href="#" class="lesson-item" data-slide="10">10. ThreadPoolExecutor</a>
+        <a href="#" class="lesson-item" data-slide="11">11. ✏️ Exercise 1</a>
+        <a href="#" class="lesson-item" data-slide="12">12. ✏️ Exercise 2</a>
+        <a href="#" class="lesson-item" data-slide="13">13. ✏️ Exercise 3</a>
+        <a href="#" class="lesson-item" data-slide="14">14. Cheat sheet</a>
+        <a href="#" class="lesson-item" data-slide="15">15. Quiz</a>
+        <a href="#" class="lesson-item" data-slide="16">16. 2️⃣ Code Challenge</a>
+        <a href="#" class="lesson-item" data-slide="17">17. 3️⃣ Thread vs Process</a>
+        <a href="#" class="lesson-item" data-slide="18">18. 4️⃣ Live Demo</a>
+        <a href="#" class="lesson-item" data-slide="19">19. 5️⃣ Trick Question</a>
+        <a href="#" class="lesson-item" data-slide="20">20. 6️⃣ Final Question</a>
+        <a href="#" class="lesson-item" data-slide="21">21. 📚 Effective Python</a>
+        <a href="#" class="lesson-item" data-slide="22">22. 🌸 March 8</a>
+      </nav>
+      <div class="progress-bar">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-text" id="progressText">1 / 22</div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="main-content">
+      <!-- Slides content -->
+      <div class="slides-container">
+        <section class="slide active" data-slide="1">
+          <div class="slide-content title-slide">
+            <h1>🔄 Python Concurrency</h1>
+            <p class="subtitle">Asynchronous Python: Forms of Concurrency</p>
+            <p class="subtitle">Parallelism · Threading · Asyncio</p>
+            <p class="hint">Why it matters: <strong>asyncio.to_thread</strong> for blocking work from async, <strong>ThreadPoolExecutor</strong> for parallel sync tasks. Concurrency patterns in real applications.</p>
+            <p class="transition-line"><strong>Roadmap:</strong> Core terms → GIL limits → choosing the model → code examples → hands-on exercises and quiz.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="2">
+          <div class="slide-content">
+            <h2>Definitions & basic terms</h2>
+            <div class="two-col">
+              <div class="col"><h3>Sync vs Async</h3><p><strong>Sync:</strong> tasks run one after another, blocking.</p><p><strong>Async:</strong> tasks can start/end independently, non-blocking.</p></div>
+              <div class="col"><h3>Concurrency vs Parallelism</h3><p><strong>Concurrency:</strong> multiple tasks make progress together (may alternate on one core).</p><p><strong>Parallelism:</strong> tasks run simultaneously on multiple cores.</p></div>
+            </div>
+            <p class="footnote"><strong>Terms:</strong> Blocking — caller waits. Thread — shared memory. Process — separate memory. Coroutine — async/await. Event loop — runs coroutines.</p>
+            <p class="footnote">Parallelism implies concurrency. Concurrency does not always imply parallelism.</p>
+            <p class="transition-line">With terms clear, the next question is: why don't Python threads speed up CPU-heavy tasks?</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="3">
+          <div class="slide-content">
+            <h2>GIL: Python's «Guard»</h2>
+            <p class="quote">The Python interpreter is a kitchen with one chef (thread). <strong>GIL</strong> is the strict head chef who won't let others in while one is working.</p>
+            <ul>
+              <li><strong>CPU-bound</strong> (math, ML): GIL turns multithreading into an illusion</li>
+              <li><strong>I/O-bound</strong> (network, API): GIL releases the thread during waiting</li>
+            </ul>
+            <p class="footnote" style="margin-top:0.75rem;"><strong>Brief facts about GIL:</strong></p>
+            <ul class="footnote" style="font-size:0.85rem; color:var(--muted); margin-top:0.25rem;">
+              <li>Only one thread executes at a time; interpreter switches between threads for concurrency</li>
+              <li>GIL applies to CPython; Jython and IronPython have no GIL</li>
+              <li>GIL makes single-threaded programs fast; I/O usually not hindered</li>
+              <li>Enables non-thread-safe C libraries → many high-performance C extensions</li>
+              <li>CPU-bound: interpreter checks every N ticks, switches threads so one doesn't block others</li>
+            </ul>
+            <p class="footnote">Myth: «GIL only in Python». Ruby (MRI) has a similar mechanism.</p>
+            <p class="transition-line">So GIL gives us the constraint. Next, let's compare the three practical models we can choose from.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="4">
+          <div class="slide-content">
+            <h2>Three concurrency paradigms</h2>
+            <div class="three-col">
+              <div class="col"><h3>threading</h3><p>Shared memory, GIL</p><p class="use">I/O bound</p></div>
+              <div class="col"><h3>multiprocessing</h3><p>Separate processes</p><p class="use">CPU bound</p></div>
+              <div class="col"><h3>asyncio</h3><p>Cooperative, single thread</p><p class="use">Lots of I/O</p></div>
+            </div>
+            <p class="transition-line">Great in theory; now map these models to workload type so decisions become obvious.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="5">
+          <div class="slide-content">
+            <h2>I/O bound vs CPU bound</h2>
+            <div class="two-col">
+              <div class="col good"><h3>📡 I/O bound</h3><ul><li>LLM API</li><li>HTTP, Redis, DB</li></ul><p class="conclusion">→ asyncio / threading</p></div>
+              <div class="col"><h3>⚙️ CPU bound</h3><ul><li>Tokenization</li><li>Embeddings, parsing</li></ul><p class="conclusion">→ multiprocessing</p></div>
+            </div>
+            <p class="transition-line">Before coding with threads, we must understand the most common bug: race conditions.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="6">
+          <div class="slide-content">
+            <h2>Race condition</h2>
+            <p class="quote">When two or more threads access shared data and at least one modifies it — outcome depends on <strong>timing</strong>, not just logic.</p>
+            <pre class="code-block"><code>counter = 0
+def increment():
+    global counter
+    counter += 1  # read → modify → write (not atomic!)
+
+# 2 threads × 1000 calls each → expect 2000, often get less</code></pre>
+            <ul>
+              <li><strong>Fix:</strong> Lock, atomic ops, or avoid shared state (Queue)</li>
+            </ul>
+            <p class="transition-line">Now let's look at the synchronization tools that prevent this in real systems.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="7">
+          <div class="slide-content">
+            <h2>Thread sync & Queue</h2>
+            <ul>
+              <li><strong>Lock</strong> — one thread at a time; prevents race conditions</li>
+              <li><strong>Semaphore</strong> — limit N threads accessing a resource</li>
+              <li><strong>Event</strong> — one thread waits for a signal from another</li>
+              <li><strong>Queue</strong> — thread-safe data passing; prefer over shared variables (Effective Python)</li>
+            </ul>
+            <p class="footnote">Pipeline: download → parse → save via queues. Minimize shared state.</p>
+            <p class="transition-line">With primitives ready, here is a fast decision matrix for everyday engineering choices.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="8">
+          <div class="slide-content">
+            <h2>When to choose what</h2>
+            <table class="decision-table">
+              <tr><th>Scenario</th><th>threading</th><th>multiprocessing</th><th>asyncio</th></tr>
+              <tr><td>Parsing 100 sites</td><td>✅ (Pool)</td><td>❌</td><td>✅ best</td></tr>
+              <tr><td>Video processing</td><td>❌</td><td>✅</td><td>❌</td></tr>
+              <tr><td>WebSocket server</td><td>❌</td><td>❌</td><td>✅</td></tr>
+              <tr><td>Bulk PDF processing</td><td>⚠️</td><td>✅ (CPU-heavy)</td><td>⚠️</td></tr>
+            </table>
+            <p class="transition-line">Decision table done. Next, validate it with practical code examples.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="9">
+          <div class="slide-content">
+            <h2>✅ Example: asyncio + to_thread</h2>
+            <img src="diagrams/03_asyncio_event_loop.svg" alt="asyncio Event Loop" class="diagram diagram-sm">
+            <pre class="code-block"><code>await asyncio.to_thread(add_message_interaction, fd, thread_id, content)</code></pre>
+            <p class="footnote">Pattern: async endpoint + blocking DB helper. We offload blocking work so event loop stays responsive.</p>
+            <p class="transition-line">Now let's compare with a ThreadPool example where we fan out many synchronous tasks.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="10">
+          <div class="slide-content">
+            <h2>✅ Example: ThreadPoolExecutor</h2>
+            <pre class="code-block"><code>with ThreadPoolExecutor(max_workers=len(users)) as ex:
+    futures = [ex.submit(call_chatstream, u["user_id"], ...) for u in users]</code></pre>
+            <p class="footnote">Pattern: many independent requests in parallel with bounded workers.</p>
+            <p class="transition-line">You saw theory and production snippets. Next: short exercises to feel the behavior directly.</p>
+          </div>
+        </section>
+
+        <section class="slide interactive" data-slide="11">
+          <div class="slide-content">
+            <h2>✏️ Exercise 1: asyncio.gather</h2>
+            <div class="exercise">
+              <textarea id="code1" spellcheck="false">import asyncio
+import time
+
+async def fake_llm_call(name, delay=0.1):
+    await asyncio.sleep(delay)
+    return f"{name} done"
+
+async def main():
+    start = time.perf_counter()
+    t1 = asyncio.create_task(fake_llm_call("A"))
+    t2 = asyncio.create_task(fake_llm_call("B"))
+    t3 = asyncio.create_task(fake_llm_call("C"))
+    r1, r2, r3 = await asyncio.gather(t1, t2, t3)
+    elapsed = time.perf_counter() - start
+    print(f"Results: {r1}, {r2}, {r3}")
+    print(f"Elapsed: {elapsed:.2f}s")
+
+await main()
+</textarea>
+              <button class="run-btn" data-target="code1" data-output="output1">▶ Run</button>
+              <div id="output1" class="output"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide interactive" data-slide="12">
+          <div class="slide-content">
+            <h2>✏️ Exercise 2: asyncio.to_thread</h2>
+            <div class="exercise">
+              <textarea id="code2" spellcheck="false">import asyncio
+import time
+
+def sync_work(sec):
+    time.sleep(sec)
+    return f"done in {sec}s"
+
+async def main():
+    result = await asyncio.to_thread(sync_work, 0.1)
+    print(result)
+
+await main()
+</textarea>
+              <button class="run-btn" data-target="code2" data-output="output2">▶ Run</button>
+              <div id="output2" class="output"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide interactive" data-slide="13">
+          <div class="slide-content">
+            <h2>✏️ Exercise 3: ThreadPoolExecutor</h2>
+            <div class="exercise">
+              <textarea id="code3" spellcheck="false"># ThreadPoolExecutor cannot start threads in the browser (Pyodide).
+# In real Python you would use:
+#   with ThreadPoolExecutor(max_workers=3) as ex:
+#       futures = [ex.submit(fake_api, n) for n in ["A", "B", "C"]]
+#       results = [f.result() for f in as_completed(futures)]
+
+def fake_api(name, delay=0.1):
+    import time
+    time.sleep(delay)
+    return f"{name}"
+
+# Sequential run here; same output. Use ThreadPoolExecutor in real Python for parallel.
+results = [fake_api(n) for n in ["A", "B", "C"]]
+print("Results:", results)
+</textarea>
+              <button class="run-btn" data-target="code3" data-output="output3">▶ Run</button>
+              <div id="output3" class="output"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="14">
+          <div class="slide-content">
+            <h2>Cheat Sheet</h2>
+            <p class="quote">Don't chase trends. asyncio isn't a «silver bullet». 10 requests → threading is simpler. multiprocessing — for heavy compute. Measure before optimizing!</p>
+            <ul class="checklist">
+              <li>LLM/API chat → asyncio</li>
+              <li>Parallel sync LLM → ThreadPoolExecutor</li>
+              <li>Sync DB from async → asyncio.to_thread</li>
+              <li>CPU-bound in async → asyncio.to_thread</li>
+              <li><strong>Profile first:</strong> cProfile, time — measure before optimizing</li>
+            </ul>
+            <p class="transition-line">Let's test understanding with a quick quiz and two challenge questions.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="15">
+          <div class="slide-content">
+            <h2>📝 Quiz</h2>
+            <div class="quiz">
+              <div class="quiz-item" data-correct="B">
+                <p><strong>1.</strong> What is the main difference between threads and processes?</p>
+                <div class="quiz-options">
+                  <label class="quiz-opt"><input type="radio" name="q1" value="A"> A. Processes share memory</label>
+                  <label class="quiz-opt"><input type="radio" name="q1" value="B"> B. Threads share memory</label>
+                  <label class="quiz-opt"><input type="radio" name="q1" value="C"> C. Threads run on GPUs</label>
+                  <label class="quiz-opt"><input type="radio" name="q1" value="D"> D. Processes cannot run in parallel</label>
+                </div>
+                <p class="quiz-feedback"></p>
+              </div>
+              <div class="quiz-item" data-correct="C">
+                <p><strong>2.</strong> What prevents true CPU parallelism with Python threads?</p>
+                <div class="quiz-options">
+                  <label class="quiz-opt"><input type="radio" name="q2" value="A"> A. Python scheduler</label>
+                  <label class="quiz-opt"><input type="radio" name="q2" value="B"> B. OS kernel</label>
+                  <label class="quiz-opt"><input type="radio" name="q2" value="C"> C. Global Interpreter Lock (GIL)</label>
+                  <label class="quiz-opt"><input type="radio" name="q2" value="D"> D. Python compiler</label>
+                </div>
+                <p class="quiz-feedback"></p>
+              </div>
+              <div class="quiz-item" data-correct="B">
+                <p><strong>3.</strong> Which is best for CPU-heavy work?</p>
+                <div class="quiz-options">
+                  <label class="quiz-opt"><input type="radio" name="q3" value="A"> A. Threads</label>
+                  <label class="quiz-opt"><input type="radio" name="q3" value="B"> B. Multiprocessing</label>
+                  <label class="quiz-opt"><input type="radio" name="q3" value="C"> C. Async</label>
+                  <label class="quiz-opt"><input type="radio" name="q3" value="D"> D. Single loop</label>
+                </div>
+                <p class="quiz-feedback"></p>
+              </div>
+              <div class="quiz-item" data-correct="B">
+                <p><strong>4.</strong> Which is best for network requests?</p>
+                <div class="quiz-options">
+                  <label class="quiz-opt"><input type="radio" name="q4" value="A"> A. Multiprocessing</label>
+                  <label class="quiz-opt"><input type="radio" name="q4" value="B"> B. Threads</label>
+                  <label class="quiz-opt"><input type="radio" name="q4" value="C"> C. GPU</label>
+                  <label class="quiz-opt"><input type="radio" name="q4" value="D"> D. Batch jobs</label>
+                </div>
+                <p class="quiz-feedback"></p>
+              </div>
+              <div class="quiz-item" data-correct="B">
+                <p><strong>5.</strong> What problem happens when two threads modify shared data simultaneously?</p>
+                <div class="quiz-options">
+                  <label class="quiz-opt"><input type="radio" name="q5" value="A"> A. Deadlock</label>
+                  <label class="quiz-opt"><input type="radio" name="q5" value="B"> B. Race condition</label>
+                  <label class="quiz-opt"><input type="radio" name="q5" value="C"> C. Memory leak</label>
+                  <label class="quiz-opt"><input type="radio" name="q5" value="D"> D. Context switching</label>
+                </div>
+                <p class="quiz-feedback"></p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="16">
+          <div class="slide-content">
+            <h2>2️⃣ Code Challenge — Predict the Output</h2>
+            <p>What will be printed?</p>
+            <pre class="code-block"><code>import threading
+counter = 0
+def increment():
+    global counter
+    for _ in range(100000):
+        counter += 1
+threads = []
+for _ in range(2):
+    t = threading.Thread(target=increment)
+    threads.append(t)
+    t.start()
+for t in threads:
+    t.join()
+print(counter)</code></pre>
+            <div class="quiz-item challenge" data-correct="C">
+              <div class="quiz-options">
+                <label class="quiz-opt"><input type="radio" name="ch1" value="A"> A. Always 200000</label>
+                <label class="quiz-opt"><input type="radio" name="ch1" value="B"> B. Always 100000</label>
+                <label class="quiz-opt"><input type="radio" name="ch1" value="C"> C. Usually less than 200000</label>
+                <label class="quiz-opt"><input type="radio" name="ch1" value="D"> D. Code crashes</label>
+              </div>
+              <p class="quiz-feedback"></p>
+            </div>
+            <p class="footnote reveal-after-answer"><strong>Why:</strong> <code>counter += 1</code> is not atomic → race condition.</p>
+            <details class="fix-version reveal-after-answer">
+              <summary>Fix version</summary>
+              <pre class="code-block"><code>lock = threading.Lock()
+def increment():
+    global counter
+    for _ in range(100000):
+        with lock:
+            counter += 1</code></pre>
+            </details>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="17">
+          <div class="slide-content">
+            <h2>3️⃣ Thread vs Process Guessing Game</h2>
+            <p><strong>Which will run faster?</strong></p>
+            <div class="two-col">
+              <div class="col">
+                <h3>Example 1 — CPU task</h3>
+                <pre class="code-block"><code>def compute():
+    sum(i*i for i in range(10_000_000))</code></pre>
+                <div class="quiz-item" data-correct="B">
+                  <div class="quiz-options">
+                    <label class="quiz-opt"><input type="radio" name="tpg1" value="A"> A. Threads</label>
+                    <label class="quiz-opt"><input type="radio" name="tpg1" value="B"> B. Multiprocessing</label>
+                  </div>
+                  <p class="quiz-feedback"></p>
+                </div>
+                <p class="footnote reveal-after-answer">Because of GIL.</p>
+              </div>
+              <div class="col">
+                <h3>Example 2 — I/O task</h3>
+                <pre class="code-block"><code>def download():
+    requests.get("https://example.com")</code></pre>
+                <div class="quiz-item" data-correct="A">
+                  <div class="quiz-options">
+                    <label class="quiz-opt"><input type="radio" name="tpg2" value="A"> A. Threads</label>
+                    <label class="quiz-opt"><input type="radio" name="tpg2" value="B"> B. Multiprocessing</label>
+                  </div>
+                  <p class="quiz-feedback"></p>
+                </div>
+                <p class="footnote reveal-after-answer">GIL releases during I/O wait.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="18">
+          <div class="slide-content">
+            <h2>4️⃣ Live Demo — I/O Concurrency</h2>
+            <div class="two-col">
+              <div class="col">
+                <h3>No concurrency</h3>
+                <pre class="code-block"><code>def task():
+    time.sleep(2)
+for _ in range(5):
+    task()
+# Result ≈ 10 seconds</code></pre>
+              </div>
+              <div class="col">
+                <h3>With threads</h3>
+                <pre class="code-block"><code>threads = []
+for _ in range(5):
+    t = threading.Thread(target=task)
+    threads.append(t)
+    t.start()
+for t in threads:
+    t.join()
+# Result ≈ 2 seconds</code></pre>
+              </div>
+            </div>
+            <p class="footnote">💡 Perfect demonstration of I/O concurrency.</p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="19">
+          <div class="slide-content">
+            <h2>5️⃣ Trick Question</h2>
+            <p>Why doesn't this run faster with threads?</p>
+            <pre class="code-block"><code>def cpu_task():
+    sum(i*i for i in range(20_000_000))
+for _ in range(4):
+    t = threading.Thread(target=cpu_task)
+    t.start()
+    threads.append(t)</code></pre>
+            <button type="button" class="quiz-check-btn reveal-trigger">Show answer</button>
+            <p class="quote reveal-after-answer">➡ GIL prevents true parallel CPU execution</p>
+            <p class="footnote reveal-after-answer"><strong>Solution:</strong> <code>from multiprocessing import Pool</code></p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="20">
+          <div class="slide-content">
+            <h2>6️⃣ Final Question</h2>
+            <p>You need to process 10 million images with ML inference. What do you choose? <em>(select all that apply)</em></p>
+            <div class="quiz-item" data-multichoice data-correct="B,D">
+              <div class="quiz-options">
+                <label class="quiz-opt"><input type="checkbox" name="ch2" value="A"> A. Threads</label>
+                <label class="quiz-opt"><input type="checkbox" name="ch2" value="B"> B. Multiprocessing</label>
+                <label class="quiz-opt"><input type="checkbox" name="ch2" value="C"> C. Async</label>
+                <label class="quiz-opt"><input type="checkbox" name="ch2" value="D"> D. GPU batch processing</label>
+              </div>
+              <button type="button" class="quiz-check-btn">Check answer</button>
+              <p class="quiz-feedback"></p>
+            </div>
+            <p class="footnote reveal-after-answer">👉 Best discussion answer: <strong>Multiprocessing + GPU batching</strong></p>
+          </div>
+        </section>
+
+        <section class="slide" data-slide="21">
+          <div class="slide-content">
+            <h2>📚 Effective Python — Threads & Concurrency</h2>
+            <ul class="checklist" style="font-size:0.9rem;">
+              <li><strong>1. Prefer Queue</strong> — <code>queue.Queue</code> for thread-safe data passing; avoids race conditions; producer/consumer pattern.</li>
+              <li><strong>2. Threads for I/O-bound</strong> — network, disk, API, DB. During I/O wait the GIL is released.</li>
+              <li><strong>3. Avoid threads for CPU-bound</strong> — use <code>multiprocessing</code> or <code>ProcessPoolExecutor</code>.</li>
+              <li><strong>4. Use concurrent.futures</strong> — <code>ThreadPoolExecutor</code> / <code>ProcessPoolExecutor</code> instead of low-level threading; less boilerplate.</li>
+              <li><strong>5. Minimize shared state</strong> — prefer message passing (queues); use locks only when necessary. Beware race conditions and deadlocks.</li>
+              <li><strong>6. Pipelines</strong> — download → parse → save via queues; improves I/O throughput.</li>
+            </ul>
+            <p class="footnote" style="margin-top:0.75rem;"><strong>Summary:</strong> I/O → threads · CPU-heavy → multiprocessing · Communication → queues · Abstraction → ThreadPoolExecutor</p>
+          </div>
+        </section>
+
+        <section class="slide thematic interactive" data-slide="22">
+          <div class="slide-content">
+            <h1>🌸 Happy March 8!</h1>
+            <p class="wish">Elegance, Grace, Strength — in parallel. Thank you! 🌷</p>
+            <div class="exercise">
+              <textarea id="code_flowers" spellcheck="false"># Threading (browser fallback: Pyodide has no threads)
+import threading
+import time
+import random
+
+def bloom(flower):
+    time.sleep(random.uniform(0.1, 0.5))
+    print(flower)
+
+flowers = ["🌸🌸🌸", "🌷🌷🌷", "🌹🌹🌹", "🌺🌺🌺", "💐💐💐"]
+try:
+    threads = [threading.Thread(target=bloom, args=(f,)) for f in flowers]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+except RuntimeError:
+    for f in flowers:
+        bloom(f)
+print("  Happy March 8!")
+</textarea>
+              <button class="run-btn" data-target="code_flowers" data-output="output_flowers">▶ Bloom!</button>
+              <div id="output_flowers" class="output"></div>
+            </div>
+          </div>
+        </section>
+      </div>
+
+      <!-- Bottom nav -->
+      <nav class="bottom-nav">
+        <button class="nav-btn prev" aria-label="Previous">← Previous</button>
+        <span class="slide-indicator">1 / 22</span>
+        <button class="nav-btn next" aria-label="Next">Next →</button>
+      </nav>
+    </main>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/pyodide/v0.24.1/full/pyodide.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
