@@ -5,7 +5,6 @@ Web presentation on concurrency and async in Python.
 ## Run
 
 ```powershell
-cd presentation
 python -m http.server 8888
 ```
 
